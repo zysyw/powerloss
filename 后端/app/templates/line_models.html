@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Line Models</title>
+</head>
+<body>
+    <h1>Line Models</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Model Model</th>
+                <th>Unit Resistance</th>
+                <th>Unit Reactance</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for line_model in line_models %}
+                <tr>
+                    <td>{{ line_model.model }}</td>
+                    <td>{{ line_model.unit_resistance }}</td>
+                    <td>{{ line_model.unit_reactance }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
