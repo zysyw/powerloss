@@ -3,7 +3,7 @@ from app import db
 
 class LineModel(db.Model):
 
-    __tablename__ = 'line_models'
+    __tablename__ = 'LineModel'
 
     id = db.Column(db.Integer, primary_key=True)
     model = db.Column(db.String(100), nullable=False)
@@ -14,3 +14,6 @@ class LineModel(db.Model):
         self.model = model
         self.unit_resistance = unit_resistance
         self.unit_reactance = unit_reactance
+
+    def to_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}

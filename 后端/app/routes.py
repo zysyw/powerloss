@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, flash
 from app.models.line_model import LineModel
 
 from app.views.upload import upload_bp
-from app.views.import_data import import_data_bp
+from app.views.edit_table import edit_table_bp
 
 
 @app.route('/')
@@ -17,7 +17,7 @@ def line_models():
 
 
 app.register_blueprint(upload_bp)
-app.register_blueprint(import_data_bp)
+app.register_blueprint(edit_table_bp)
 
 if __name__ == '__main__':
     app.run(debug=True)

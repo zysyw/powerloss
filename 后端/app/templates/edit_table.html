@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Edit Table</h1>
+        </div>
+    </div>
+    <form action="{{ url_for('edit_table.edit_table') }}" method="POST" class="form-inline">
+      <div class="form-group">
+        <label for="table-name-select">Select Table:  </label>
+        <select class="form-control mr-2" id="table-name-select" name="table_name" style="width: 200px;">
+            {% for table_name in table_names %}
+            <option>{{ table_name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" style="margin-left: 130px;">Edit</button>
+      </div>
+    </form>
+    {% if records %}
+    <div class="table-responsive">
+        <div id="edit-table"></div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+      // Serialize the records variable to a JSON object
+      var recordsJson = JSON.parse('{{ records | tojson | safe }}');
+  
+      // Process table data
+      var tableData = recordsJson.map(record => {
+        var newRow = {};
+        for (var key in record) {
+          if (!key.startsWith('_')) {
+            newRow[key] = record[key];
+          }
+        }
+        return newRow;
+      });
+  
+      // Process columns
+      var columns = Object.keys(recordsJson[0]).filter(key => !key.startsWith('_')).map(key => {
+        return {title: key, field: key};
+      });
+  
+      // Initialize Tabulator
+      var table = new Tabulator("#edit-table", {
+        data: tableData,
+        columns: columns,
+        layout: "fitDataTable",
+        pagination: "local",
+        paginationSize: 10,
+        paginationSizeSelector: [10, 25, 50, 100],
+        movableColumns: true,
+      });
+    });
+  </script>
+{% endblock %}
