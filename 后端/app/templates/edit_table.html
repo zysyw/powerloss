@@ -46,9 +46,9 @@
   
       // Process columns
       var columns = Object.keys(recordsJson[0]).filter(key => !key.startsWith('_')).map(key => {
-        return {title: key, field: key};
+        return {title: key, field: key, editor: "input"};
       });
-  
+
       // Initialize Tabulator
       var table = new Tabulator("#edit-table", {
         data: tableData,
@@ -58,6 +58,17 @@
         paginationSize: 10,
         paginationSizeSelector: [10, 25, 50, 100],
         movableColumns: true,
+      });
+
+      columns.push({
+        title: 'Actions',
+        headerSort: false,
+        formatter: function(cell, formatterParams, onRendered) {
+          return '<button class="btn btn-primary btn-sm edit-btn">Edit</button> <button class="btn btn-success btn-sm save-btn">Save</button> <button class="btn btn-danger btn-sm delete-btn">Delete</button>';
+        },
+        cellClick: function(e, cell) {
+          e.stopPropagation(); // 阻止事件冒泡以防止编辑器打开
+        }
       });
     });
   </script>
