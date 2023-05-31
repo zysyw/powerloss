@@ -46,7 +46,7 @@
   
       // Process columns
       var columns = Object.keys(recordsJson[0]).filter(key => !key.startsWith('_')).map(key => {
-        return {title: key, field: key, editor: "input"};
+        return {title: key, field: key, editor:"input", editor: "input"};
       });
 
       // Initialize Tabulator
