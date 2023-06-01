@@ -1,0 +1,466 @@
+Public Sub calcLoss()
+
+    Dim CmdStrings As Scripting.Dictionary
+    Dim CmdString As String
+    Dim DSSObjects As Scripting.Dictionary
+    Dim DSSLineCode As DSSObject
+    Dim DSSLine As DSSObject
+    Dim DSSLoadShape As DSSLoadShapeObject
+    Dim DSSVoltageShape As DSSLoadShapeObject
+    Dim DSSTransformer As DSSObject
+    Dim i As Long
+    Dim j As Long
+    Dim GetStringsResult As String
+    Dim BalanceBus As String
+    Dim DSSBalanceBus As DSSBalanceBusObject
+        
+    StartDSS
+    
+    Set DSSObjects = New Dictionary
+    Set CmdStrings = New Dictionary
+        
+    Set DSSBalanceBus = New DSSBalanceBusObject
+    initBalanceBus DSSBalanceBus
+    BalanceBus = DSSBalanceBus.getBalanceBus
+    If BalanceBus = "" Then
+        Exit Sub
+    End If
+
+    CmdStrings.Add 1, "Clear"
+    CmdString = "new object=circuit.CalcLineLoss "
+    CmdString = CmdString & "basekv=115 1.00 0.0 50.0 3 20000 21000 4.0 3.0"
+    CmdStrings.Add 2, CmdString
+    'Substation transformer
+    CmdStrings.Add 3, "new transformer.sub phases=3 windings=2 buses=(SourceBus " & BalanceBus & ") kvs=(115 10.5) kvas=(20000 20000) XHL=7"
+    
+    'Define LineCode
+    Set DSSLineCode = New DSSObject
+    initLineCode DSSLineCode
+    DSSObjects.Add 1, DSSLineCode
+    
+    'Define Line
+    Set DSSLine = New DSSObject
+    initLine DSSLine
+    DSSObjects.Add 2, DSSLine
+    
+    'Define Transformer
+    Set DSSTransformer = New DSSObject
+    initTransformer DSSTransformer
+    DSSObjects.Add 3, DSSTransformer
+    
+    For i = 1 To DSSObjects.Count
+        Dim dObject As Variant
+        Set dObject = DSSObjects(i)
+        GetStringsResult = dObject.getCmdStrings(CmdStrings)
+        If GetStringsResult <> "成功" Then
+            MsgBox GetStringsResult, vbOKOnly
+            Exit Sub
+        End If
+    Next i
+    
+    Set DSSLoadShape = New DSSLoadShapeObject
+    initLoadShape DSSLoadShape
+    GetStringsResult = DSSLoadShape.getCmdStrings(CmdStrings)
+    If GetStringsResult <> "成功" Then
+        MsgBox GetStringsResult, vbOKOnly
+        Exit Sub
+    End If
+    
+    Set DSSVoltageShape = New DSSLoadShapeObject
+    initVoltageShape DSSVoltageShape
+    GetStringsResult = DSSVoltageShape.getCmdStrings(CmdStrings)
+    If GetStringsResult <> "成功" Then
+        MsgBox GetStringsResult, vbOKOnly
+        Exit Sub
+    End If
+    CmdStrings.Add CmdStrings.Count + 1, "Vsource.Source.daily=" & DSSVoltageShape.LoadShapeName
+
+    buildDSSLoad CmdStrings
+    
+    buildDSSEnergyMeter BalanceBus, DSSTransformer.Rg, CmdStrings
+    
+    'printCmdStrings CmdStrings
+    
+    calcCmdStrings CmdStrings
+    reviewCircuit
+    DSSText.Command = "Set mode=daily number=24 h=3600"
+    DSSText.Command = "solve"
+    'DSSText.Command = "show buses"
+    'DSSText.Command = "show powers kva elements"
+    'DSSText.Command = "show meters"
+    
+    outputCircuitLosses
+    
+    
+    
+End Sub
+
+Public Sub initLineCode(DSSLineCode As DSSObject)
+
+    Dim Parameters As New Scripting.Dictionary
+    DSSLineCode.WorkSheetName = "参数库"
+    DSSLineCode.KeyWord = "导线型号"
+    Parameters.Add Key:=1, Item:="导线型号"
+    Parameters.Add Key:=2, Item:="电阻(Ω/km)"
+    Parameters.Add Key:=3, Item:="电抗(Ω/km)"
+    Set DSSLineCode.NeedParmeters = Parameters
+
+End Sub
+
+Public Sub initLine(DSSLine As DSSObject)
+
+    Dim Parameters As New Scripting.Dictionary
+    DSSLine.WorkSheetName = "配电线路"
+    DSSLine.KeyWord = "线段名称"
+    Parameters.Add Key:=1, Item:="线段名称"
+    Parameters.Add Key:=2, Item:="线段头母线"
+    Parameters.Add Key:=3, Item:="线段尾母线"
+    Parameters.Add Key:=4, Item:="线路型号"
+    Parameters.Add Key:=5, Item:="单位电阻(Ω/km)"
+    Parameters.Add Key:=6, Item:="单位电抗(Ω/km)"
+    Parameters.Add Key:=7, Item:="线路长度(km)"
+    Set DSSLine.NeedParmeters = Parameters
+    DSSLine.BalanceBusSheet = "配电线路"
+
+End Sub
+
+Public Sub initTransformer(DSSTransformer As DSSObject)
+
+    Dim Parameters As New Scripting.Dictionary
+    DSSTransformer.WorkSheetName = "配电线路"
+    DSSTransformer.KeyWord = "变压器名称"
+    Parameters.Add Key:=1, Item:="变压器名称"
+    Parameters.Add Key:=2, Item:="高压侧母线"
+    Parameters.Add Key:=3, Item:="低压侧母线"
+    Parameters.Add Key:=4, Item:="变压器容量(kVA)"
+    Parameters.Add Key:=5, Item:="高压侧额定电压(kV)"
+    Parameters.Add Key:=6, Item:="空载损耗(%)"
+    Parameters.Add Key:=7, Item:="负载损耗(%)"
+    Parameters.Add Key:=8, Item:="短路电压百分比(%)"
+    Parameters.Add Key:=9, Item:="空载电流百分比(%)"
+    Parameters.Add Key:=10, Item:="低压侧额定电压(kV)"
+    Set DSSTransformer.NeedParmeters = Parameters
+    DSSTransformer.BalanceBusSheet = "配电线路"
+
+End Sub
+
+Public Sub initLoadShape(DSSLoadShape As DSSLoadShapeObject)
+    Dim kwParmeters As New Scripting.Dictionary
+    Dim kvarParmeters As New Scripting.Dictionary
+    Dim SumKVA As Double
+    
+    DSSLoadShape.LoadShapeName = "day"
+    DSSLoadShape.WorkSheetName = "运行数据"
+    DSSLoadShape.KeyWords.Add 1, "有功表"
+    DSSLoadShape.KeyWords.Add 2, "无功表"
+    kwParmeters.Add 1, "有功表"
+    kwParmeters.Add 2, "kw"
+    kvarParmeters.Add 1, "无功表"
+    kvarParmeters.Add 2, "kVar"
+    DSSLoadShape.NeedParmeters.Add 1, kwParmeters
+    DSSLoadShape.NeedParmeters.Add 2, kvarParmeters
+    SumKVA = getTransformerSumKVA
+    DSSLoadShape.Baseline.Add 1, SumKVA * snapPF 'pbase
+    DSSLoadShape.Baseline.Add 2, SumKVA * ((1 - snapPF * snapPF) ^ 0.5) 'qbase
+    
+End Sub
+
+Public Sub initVoltageShape(DSSVoltageShape As DSSLoadShapeObject)
+    Dim kvParmeters As New Scripting.Dictionary
+    Dim SumKVA As Double
+    Const snapPF As Double = 0.8
+    
+    DSSVoltageShape.LoadShapeName = "SourceVoltage"
+    DSSVoltageShape.WorkSheetName = "运行数据"
+    DSSVoltageShape.KeyWords.Add 1, "首段电压"
+    kvParmeters.Add 1, "首段电压"
+    kvParmeters.Add 2, "kV"
+    DSSVoltageShape.NeedParmeters.Add 1, kvParmeters
+    DSSVoltageShape.Baseline.Add 1, 10.5 'vbase
+    
+End Sub
+
+Public Sub initBalanceBus(DSSBalanceBus As DSSBalanceBusObject)
+    DSSBalanceBus.WorkSheetName = "配电线路"
+    DSSBalanceBus.KeyWord = "平衡节点"
+End Sub
+
+Public Sub calcCmdStrings(CmdStrings As Dictionary)
+
+    Dim testCommands As New Dictionary
+    'Set testCommands = CmdStrings
+    testCommands.Add testCommands.Count + 1, "Set voltagebases=(115 10.5 0.4)"
+    testCommands.Add testCommands.Count + 1, "Set basefrequency = 50"
+    testCommands.Add testCommands.Count + 1, "Calcv"
+    'testCommands.Add testCommands.Count + 1, "Show Buses"
+    ExecuteCommands CmdStrings
+    ExecuteCommands testCommands
+    'DSSText.Command = "Clear"
+
+End Sub
+
+Public Sub ExecuteCommands(CmdStrings As Dictionary)
+
+    Dim i As Long
+    For i = 1 To CmdStrings.Count
+        DSSText.Command = CmdStrings(i)
+    Next i
+
+End Sub
+
+Public Sub printCmdStrings(CmdStrings As Scripting.Dictionary)
+    
+    Dim i As Integer
+    For i = 1 To CmdStrings.Count
+        Debug.Print "Key:" & i & "  " & "Item:" & CmdStrings(i)
+    Next i
+    
+End Sub
+
+Public Function getTransformerSumKVA() As Double
+    Dim iDev As Long
+    Dim DSSTransformer As OpenDSSengine.Transformers
+    Dim V As Variant
+    Dim TransformerSumKVA As Long
+    
+    Set DSSTransformer = DSSCircuit.Transformers
+    TransformerSumKVA = 0
+    
+'    Debug.Print , "Count=", DSSTransformer.Count
+'    V = DSSTransformer.AllNames
+'    Debug.Print , "Names="
+'    For iDev = LBound(V) To UBound(V)
+'        Debug.Print , V(iDev)
+'    Next iDev
+    
+    iDev = DSSTransformer.First
+    Do While iDev > 0
+       If DSSTransformer.Name <> "sub" Then
+        TransformerSumKVA = TransformerSumKVA + DSSTransformer.kVA
+       End If
+       iDev = DSSTransformer.Next
+    Loop
+    getTransformerSumKVA = TransformerSumKVA
+End Function
+
+Public Sub buildDSSLoad(CmdStrings As Scripting.Dictionary)
+    Dim iDev As Long
+    Dim DSSTransformer As OpenDSSengine.Transformers
+    Dim CmdString As String
+    Dim TransformerSumKVA As Long
+    
+    Set DSSTransformer = DSSCircuit.Transformers
+    
+    iDev = DSSTransformer.First
+    Do While iDev > 0
+       If DSSTransformer.Name <> "sub" Then
+        CmdString = "new load." & DSSTransformer.Name & " bus1=" & DSSTransformer.Name & " kv=0.4 kva=" & _
+            DSSTransformer.kVA & " pf=" & snapPF & " daily=day"
+        CmdStrings.Add CmdStrings.Count + 1, CmdString
+       End If
+       iDev = DSSTransformer.Next
+    Loop
+End Sub
+
+Public Sub buildDSSEnergyMeter(BalanceBus As String, transRg As Range, CmdStrings As Scripting.Dictionary)
+    Dim iDev As Long
+    Dim DSSTransformer As OpenDSSengine.Transformers
+    Dim DSSLine As OpenDSSengine.Lines
+    Dim CmdString As String
+    Dim DedicatedTransformers As Scripting.Dictionary
+    Dim row As Long
+    Dim column As Long
+    Dim KeyWordCell As Range
+    
+    Set DSSLine = DSSCircuit.Lines
+    iDev = DSSLine.First
+    Do While iDev > 0
+       If StrComp(DSSLine.Bus1, BalanceBus, vbTextCompare) = 0 Then
+        CmdString = "new energyMeter.LineSum" & " element=Line." & DSSLine.Name & " terminal=1"
+        CmdStrings.Add CmdStrings.Count + 1, CmdString
+        Exit Do
+       End If
+       iDev = DSSLine.Next
+    Loop
+    
+    Set DedicatedTransformers = New Scripting.Dictionary
+    DedicatedTransformers.CompareMode = vbTextCompare
+    With transRg.Cells
+        Set KeyWordCell = .Find("是否专变", LookIn:=xlValues, LookAt:=xlWhole)
+        column = KeyWordCell.column
+    End With
+    For row = 2 To transRg.Rows.Count
+        If transRg.Cells(row, column).Text <> "" Then
+            If transRg.Cells(row, column).Text = "是" Then
+                DedicatedTransformers.Add transRg.Cells(row, 1).Text, row 'Default first column in rg is "变压器名称"
+            End If
+        End If
+    Next row
+    
+    Set DSSTransformer = DSSCircuit.Transformers
+    iDev = DSSTransformer.First
+    Do While iDev > 0
+       If DedicatedTransformers.Exists(DSSTransformer.Name) Then
+        CmdString = "new energyMeter." & DSSTransformer.Name & " element=Transformer." & DSSTransformer.Name & " terminal=1 Enabled=no"
+        CmdStrings.Add CmdStrings.Count + 1, CmdString
+       End If
+       iDev = DSSTransformer.Next
+    Loop
+End Sub
+
+Public Sub printArray(arr As Variant)
+    Dim i As Long
+    For i = LBound(arr) To UBound(arr)
+        Debug.Print arr(i)
+    Next i
+    
+End Sub
+
+Sub printDictionary(dict As Scripting.Dictionary)
+    
+    Dim k As Variant
+    For Each k In dict.Keys
+        ' Print key and value
+        Debug.Print k, dict(k)
+    Next
+
+End Sub
+
+Public Sub outputCircuitLosses()
+
+    Dim rgN As Variant
+    Dim rgV As Variant
+    Dim ws As Worksheet
+    Dim iRow As Long
+    Dim iColumn As Long
+    Dim iLine As Long
+    Dim j As Long
+    Dim LineLosses As Scripting.Dictionary
+    Dim TransFormerLosses As Scripting.Dictionary
+    Dim DedicatedTransformers As Scripting.Dictionary
+    Dim SensorNames As Variant
+    Dim ElementLosses As Variant
+    
+    Set ws = Worksheets("计算结果")
+    ws.Rows.ClearContents
+    
+    DSSMeters.Name = "LineSum"
+    rgN = DSSMeters.RegisterNames
+    rgV = DSSMeters.RegisterValues
+    
+    iRow = 1
+    iColumn = 1
+    ws.Rows(iRow + 1).NumberFormat = "0.00"
+    ws.Cells(iRow, iColumn) = "有损电量kWh"
+    If rgN(LBound(rgN)) = "kWh" Then
+        ws.Cells(iRow + 1, iColumn) = rgV(LBound(rgN))
+    End If
+    ws.Cells(iRow, 2) = "无损电量kWh"
+    If rgN(LBound(rgN) + 4) = "Zone kWh" Then
+        ws.Cells(iRow + 1, iColumn + 1) = rgV(LBound(rgN) + 4)
+    End If
+    ws.Cells(iRow, 3) = "发电电量kWh"
+    If rgN(LBound(rgN) + 28) = "Gen kWh" Then
+        ws.Cells(iRow + 1, iColumn + 2) = rgV(LBound(rgN) + 28)
+    End If
+    
+    iRow = iRow + 2
+    ws.Rows(iRow + 1).NumberFormat = "0.00"
+    ws.Rows(iRow + 2).NumberFormat = "0.00%"
+    ws.Cells(iRow, 1) = "总损耗kWh"
+    If rgN(LBound(rgN) + 12) = "Zone Losses kWh" Then
+        ws.Cells(iRow + 1, iColumn) = rgV(LBound(rgN) + 12)
+        ws.Cells(iRow + 2, iColumn) = rgV(LBound(rgN) + 12) / rgV(LBound(rgN) + 4)
+    End If
+    ws.Cells(iRow, 2) = "负载损耗kWh"
+    If rgN(LBound(rgN) + 16) = "Load Losses kWh" Then
+        ws.Cells(iRow + 1, iColumn + 1) = rgV(LBound(rgN) + 16)
+        ws.Cells(iRow + 2, iColumn + 1) = rgV(LBound(rgN) + 16) / rgV(LBound(rgN) + 4)
+    End If
+    ws.Cells(iRow, 3) = "空载损耗kWh"
+    If rgN(LBound(rgN) + 18) = "No Load Losses kWh" Then
+        ws.Cells(iRow + 1, iColumn + 2) = rgV(LBound(rgN) + 18)
+        ws.Cells(iRow + 2, iColumn + 2) = rgV(LBound(rgN) + 18) / rgV(LBound(rgN) + 4)
+    End If
+    ws.Cells(iRow, 4) = "线路损耗kWh"
+    If rgN(LBound(rgN) + 22) = "Line Losses" Then
+        ws.Cells(iRow + 1, iColumn + 3) = rgV(LBound(rgN) + 22)
+        ws.Cells(iRow + 2, iColumn + 3) = rgV(LBound(rgN) + 22) / rgV(LBound(rgN) + 4)
+    End If
+    ws.Cells(iRow, 5) = "变压器损耗kWh"
+    If rgN(LBound(rgN) + 23) = "Transformer Losses" Then
+        ws.Cells(iRow + 1, iColumn + 4) = rgV(LBound(rgN) + 23)
+        ws.Cells(iRow + 2, iColumn + 4) = rgV(LBound(rgN) + 23) / rgV(LBound(rgN) + 4)
+    End If
+    
+    '******计算单个元件的损耗
+    '***先找出专变
+    SensorNames = DSSSensors.AllNames
+    Set LineLosses = New Scripting.Dictionary
+    Set TransFormerLosses = New Scripting.Dictionary
+    LineLosses.CompareMode = vbTextCompare
+    DSSText.Command = "Set mode=Daily number=1"
+    iRow = iRow + 4
+    For j = 1 To 24
+       DSSCircuit.Solution.Solve    ' solves one step at a time
+        ' cycle through the LINE elements collecting Losses
+        iLine = DSSLines.First   ' sets first LINE active
+        Do While iLine > 0
+            ElementLosses = DSSCktElement.Losses  ' gets two-element array
+            If LineLosses.Exists(DSSCktElement.Name) Then
+                LineLosses(DSSCktElement.Name) = LineLosses(DSSCktElement.Name) + ElementLosses(0)
+            Else
+                LineLosses.Add DSSCktElement.Name, ElementLosses(0) '/ 1000#  ' This is kW
+            End If
+            iLine = DSSLines.Next    ' go to next Line
+        Loop
+    
+    Next j
+    'printDictionary LineLosses
+    Dim k As Variant
+    For Each k In LineLosses.Keys
+        ws.Cells(iRow, 1) = k
+        ws.Cells(iRow, 2) = LineLosses(k)
+        iRow = iRow + 1
+    Next
+
+    'DSSText.Command = "show powers kva elements"
+    
+    'printArray rgN
+    'printArray rgV
+    ws.Activate
+End Sub
+
+Public Sub reviewCircuit()
+
+    Dim IsolatedLoads() As String
+    Dim IsolatedBranches() As String
+    Dim Loops() As String
+
+    Set DSSTopology = DSSCircuit.Topology
+    
+    If DSSTopology.NumIsolatedBranches > 0 Then
+    IsolatedBranches = DSSTopology.AllIsolatedBranches
+        MsgBox "存在孤立支路: " & Join(IsolatedBranches, ",")
+        End
+    End If
+    
+    If DSSTopology.NumIsolatedLoads > 0 Then
+        IsolatedLoads = DSSTopology.AllIsolatedLoads
+        MsgBox "存在孤立负荷: " & Join(IsolatedLoads, ",")
+        End
+    End If
+    
+    If DSSTopology.NumLoops > 0 Then
+        Loops = DSSTopology.AllLoopedPairs
+        MsgBox "存在循环支路: " & Join(Loops, ",")
+        End
+    End If
+    
+    If DSSTopology.ParallelBranch > 0 Then
+        Loops = DSSTopology.AllLoopedPairs
+        MsgBox "存在并列支路: " & DSSTopology.ParallelBranch
+        End
+    End If
+
+End Sub
