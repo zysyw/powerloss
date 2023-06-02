@@ -1,0 +1,4 @@
+{
+    "LINECODE": "New LineCode.{LineCodeName} R1={R1} X1={X1}",
+    "LINE": "New Line.{LineName} Bus1={Bus1} Bus2={Bus2} Length={Length} Linecode={Linecode}"
+}

@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 import re
+import os
 
 # 示例数据
 data = {
@@ -8,24 +9,26 @@ data = {
     'Bus1': ['Bus1', 'Bus2', 'Bus3'],
     'Bus2': ['Bus2', 'Bus3', 'Bus4'],
     'Length': [10, 20, 30],
-    'Units': ['km', 'km', 'km'],
-    'Phases': [3, 3, 3],
-    'R1': [0.01, 0.01, 0.01],
-    'X1': [0.02, 0.02, 0.02],
-    'C1': [0.03, 0.03, 0.03],
+    'Linecode': ['16', '16', '16']
 }
 
 df_lines = pd.DataFrame(data)
 
-# 检查是否存在 LineName 列，若不存在则创建。————该功能不在本模块中实现
-#if 'LineName' not in df_lines.columns:
-#    df_lines['LineName'] = ['Line'+str(i+1) for i in range(len(df_lines))]
+def load_config():
+    # 获取当前模块文件所在的目录
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    # 构造配置文件的路径
+    config_file = os.path.join(current_dir, 'opendss_config.json')
+
+    with open(config_file, 'r') as f:
+        config = json.load(f)
+
+    return config
 
 def create_scripts_from_df(df, component_type):
     
     # 读取配置文件
-    with open('opendss_config.json', 'r') as f:
-        config = json.load(f)
+    config = load_config()
     
     dss_scripts = []
     required_columns = get_required_columns_from_config(config, component_type)
