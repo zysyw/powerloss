@@ -1,0 +1,3 @@
+Clear
+new object=circuit.CalcLineLoss basekv=115 1.00 0.0 50.0 3 20000 21000 4.0 3.0
+new transformer.sub phases=3 windings=2 buses=(SourceBus Sub10kVBus) kvs=(115 10.5) kvas=(20000 20000) XHL=7

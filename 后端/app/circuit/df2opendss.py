@@ -55,8 +55,7 @@ def get_required_columns_from_config(config, component_type):
     return required_columns
 
 if __name__ == '__main__':
-    import os
-    print(os.path.dirname(os.path.realpath(__file__)))
+
     dss_lines = create_scripts_from_df(df_lines, 'LINE')
     # 打印转换后的脚本语句
     for line in dss_lines:
