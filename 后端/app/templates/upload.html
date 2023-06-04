@@ -9,7 +9,7 @@
     </div>
     <div class="row">
         <div class="col-md-6">
-            <form method="POST" enctype="multipart/form-data" action="{{ url_for('upload.upload_csv') }}" class="form-inline">
+            <form method="POST" enctype="multipart/form-data" action="{{ url_for('upload_element.upload_csv') }}" class="form-inline">
                 <div class="form-group">
                     <input type="file" name="file" class="form-control-file mr-2">
                 </div>
@@ -18,7 +18,7 @@
         </div>
         <br>
         <div class="col-md-6">
-            <form action="{{ url_for('upload.csv2database') }}" method="POST" enctype="multipart/form-data" class="form-inline">
+            <form action="{{ url_for('upload_element.csv2database') }}" method="POST" enctype="multipart/form-data" class="form-inline">
                 <div class="form-group">
                     <label for="table-name-select">Select Table:</label>
                     <select class="form-control mr-2" id="table-name-select" name="table_name">

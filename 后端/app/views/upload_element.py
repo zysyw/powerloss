@@ -1,11 +1,11 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from .file_uploader import FileUploader
 from flask import session
-from app import app,db
-from sqlalchemy import MetaData, Table, create_engine, text
+from app import app
 import csv
+import os
+import json
 import pandas as pd
-from ..models.line_model import LineModel
 
 upload_bp = Blueprint('upload', __name__, url_prefix='/upload')
 upload_folder = app.config['UPLOAD_FOLDER']
@@ -15,7 +15,7 @@ file_uploader = FileUploader(app,upload_folder,allowed_extensions)
 @upload_bp.route('/', methods=['GET', 'POST']) 
 def upload_csv():
     data = None
-    table_names = get_all_table_names()
+    table_names = get_all_element_names()
     if request.method == 'POST':
         file = request.files['file']
         filepath = file_uploader.save_file(file)
@@ -34,21 +34,13 @@ def upload_csv():
 def csv2database():
     filepath = session.get('file_path', None)
     table_name = request.form.get('table_name')
-    column_mapping = {
-        '导线型号': 'model',
-        '电阻(Ω/km)': 'unit_resistance',
-        '电抗(Ω/km)': 'unit_reactance',
-        # 添加其他映射，如果有的话
-    }
+
     if filepath:
         # 执行导入操作
         df = pd.read_csv(filepath)
 
         # 对列名进行映射
-        df = df.rename(columns=column_mapping)
-
-        # 将数据导入数据库，选择覆盖或追加方式
-        df.to_sql(table_name, db.engine, if_exists='replace', index=True, index_label='id')
+        df = df.rename(columns=get_head_mappings()[table_name])
 
         flash('File imported into ' +  table_name +' successfully!', 'success')
     else:
@@ -57,8 +49,17 @@ def csv2database():
     return redirect(url_for('upload.upload_csv'))
 
 # 获取所有表名
-def get_all_table_names():
-    meta = MetaData()
-    meta.reflect(bind=db.engine)
-    table_names = [table for table in meta.tables]
-    return table_names    
+def get_head_mappings():
+    # 获取当前模块文件所在的目录
+    current_dir = os.path.dirname(os.path.realpath(__file__))
+    # 构造配置文件的路径
+    head_mapping_file = os.path.join(current_dir, 'csv_head_mapping.json')
+
+    with open(head_mapping_file, 'r') as f:
+        head_mappings = json.load(f)
+
+    return head_mappings
+
+def get_all_element_names():
+    #从头映射字典中的键值集合中获取元件的类名称，因为所有的元件都需要做列名称映射
+    return json.loads(get_head_mappings()).keys()
