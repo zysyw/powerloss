@@ -3,7 +3,7 @@ from flask import Flask, render_template, request, flash
 from app.models.line_model import LineModel
 
 from app.views.upload_element import upload_bp
-from 后端.app.views.edit_element import edit_table_bp
+from app.views.edit_element import edit_table_bp
 
 
 @app.route('/')

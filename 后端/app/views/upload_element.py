@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+from flask import Blueprint, render_template, request, redirect, url_for, flash,jsonify
 from .file_uploader import FileUploader
 from flask import session
 from app import app
@@ -23,9 +23,8 @@ def upload_csv():
             flash('File uploaded successfully.', 'success')
             session['file_path'] = filepath
             # 读取 CSV 文件内容
-            with open(filepath, 'r', encoding='utf-8') as csvfile:
-                reader = csv.reader(csvfile)
-                data = [row for row in reader]
+            df = pd.read_csv(filepath)
+            data = df.to_dict(orient='records')
         else:
             flash('Failed to upload file. Please try again.', 'error')
     return render_template('upload.html', data=data, table_names=table_names)
@@ -55,11 +54,11 @@ def get_head_mappings():
     # 构造配置文件的路径
     head_mapping_file = os.path.join(current_dir, 'csv_head_mapping.json')
 
-    with open(head_mapping_file, 'r') as f:
+    with open(head_mapping_file, 'r', encoding='utf-8') as f:
         head_mappings = json.load(f)
 
     return head_mappings
 
 def get_all_element_names():
-    #从头映射字典中的键值集合中获取元件的类名称，因为所有的元件都需要做列名称映射
-    return json.loads(get_head_mappings()).keys()
+    #从头映射字典中的值集合中获取元件的类名称，因为所有的元件都需要做列名称映射
+    return get_head_mappings().keys()
