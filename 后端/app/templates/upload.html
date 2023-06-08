@@ -18,7 +18,7 @@
         </div>
         <br>
         <div class="col-md-6">
-            <form action="{{ url_for('upload.csv2database') }}" method="POST" enctype="multipart/form-data" class="form-inline">
+            <form id="upload-form" class="form-inline">
                 <div class="form-group">
                     <label for="table-name-select">Select Table:</label>
                     <select class="form-control mr-2" id="table-name-select" name="table_name">
@@ -27,7 +27,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary" style="margin-left: 150px;">Import...</button>
+                <button type="button" id="import-btn" class="btn btn-primary" style="margin-left: 150px;">Import...</button>
             </form>
         </div>
     </div>
@@ -55,7 +55,7 @@
     if (tableData.length > 0) {
       var keys = Object.keys(tableData[0]);
       keys.forEach(function(key) {
-        columns.push({title: key, field: key});
+        columns.push({title: key, field: key, editor: "input"});
       });
     }
 
@@ -66,6 +66,29 @@
       pagination: "local",
       paginationSize: 10,
       paginationSizeSelector: [10, 25, 50, 100]
+    });
+
+    $('#import-btn').click(function() {
+        var tableName = $('#table-name-select').val(); // Get selected table name
+        var data = table.getData(); // Get all data of the table
+        var postData = {
+            table_name: tableName,
+            data: data,
+        };
+
+        $.ajax({
+            url: "{{ url_for('upload.csv2database') }}",
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(postData),
+            dataType: 'json',
+            success: function(response) {
+            // TODO: Handle the response from the server
+            },
+            error: function(error) {
+            // TODO: Handle errors
+            },
+        });
     });
   });
 </script>

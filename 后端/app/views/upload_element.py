@@ -21,7 +21,6 @@ def upload_csv():
         filepath = file_uploader.save_file(file)
         if filepath:
             flash('File uploaded successfully.', 'success')
-            session['file_path'] = filepath
             # 读取 CSV 文件内容
             df = pd.read_csv(filepath)
             data = df.to_dict(orient='records')
@@ -31,15 +30,19 @@ def upload_csv():
 
 @upload_bp.route('/import', methods=['POST'])
 def csv2database():
-    filepath = session.get('file_path', None)
-    table_name = request.form.get('table_name')
+    table_data = request.get_json()
 
-    if filepath:
+    table_name = table_data['table_name']
+    print(table_name)
+    data = table_data['data']
+
+    if data:
         # 执行导入操作
-        df = pd.read_csv(filepath)
+        df = pd.DataFrame(data)
+        print(df)
 
         # 对列名进行映射
-        df = df.rename(columns=get_head_mappings()[table_name])
+        #df = df.rename(columns=get_head_mappings()[table_name])
 
         flash('File imported into ' +  table_name +' successfully!', 'success')
     else:
