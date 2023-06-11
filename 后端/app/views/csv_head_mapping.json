@@ -1,13 +1,13 @@
 {
     "LINECODE": {
-        "导线型号": "model",
-        "电阻(Ω/km)": "unit_resistance",
-        "电抗(Ω/km)": "unit_reactance"
+        "导线型号": "LineCodeName",
+        "电阻(Ω/km)": "R1",
+        "电抗(Ω/km)": "X1"
     },
     "LINE": {
         "线段名称": "LineName",
-    	"线段头母线": "bus1",
-        "线段尾母线": "bus2",
+    	"线段头母线": "Bus1",
+        "线段尾母线": "Bus2",
         "线路型号": "Linecode",
         "线路长度(km)": "Length"
     }

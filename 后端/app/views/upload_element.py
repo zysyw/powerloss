@@ -1,8 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash,jsonify
 from .file_uploader import FileUploader
-from flask import session
-from app import app
-import csv
+from app import app, opendss_dict
 import os
 import json
 import pandas as pd
@@ -14,26 +12,50 @@ file_uploader = FileUploader(app,upload_folder,allowed_extensions)
 
 @upload_bp.route('/', methods=['GET', 'POST']) 
 def upload_csv():
-    data = None
-    table_names = get_all_element_names()
+    upload_object_counts = {}
+    upload_object_types_count = 0
+    global_object_counts = {}
+    global_object_types_count = 0
+    return_message={}
     if request.method == 'POST':
         file = request.files['file']
         filepath = file_uploader.save_file(file)
         if filepath:
-            flash('File uploaded successfully.', 'success')
-            # 读取 CSV 文件内容
-            df = pd.read_csv(filepath)
-            data = df.to_dict(orient='records')
+            # 读取 excel 文件内容
+            excel_dict = pd.read_excel(filepath, sheet_name=None)
+            #把excel文件的列名称更改为opendss对象名称，如“导线型号”->“LineModel"
+            mapping = get_head_mappings()
+            for object_name, df in excel_dict.items():
+                if object_name in mapping:
+                    df.rename(columns=mapping[object_name], inplace=True)
+            # 计算本次上传的统计信息
+            upload_object_counts = {name: len(df) for name, df in excel_dict.items()}
+            upload_object_types_count = len(excel_dict)
+            # 更新全局字典并计算总的统计信息
+            opendss_dict.update(excel_dict)
+            global_object_counts = {name: len(df) for name, df in opendss_dict.items()}
+            global_object_types_count = len(opendss_dict)
+            #
+            # return_message={'message': 'File uploaded successfully.'}
         else:
-            flash('Failed to upload file. Please try again.', 'error')
-    return render_template('upload.html', data=data, table_names=table_names)
+            upload_object_counts = {}
+            upload_object_types_count = 0
+            global_object_counts = {}
+            global_object_types_count = 0
+            #
+            # return_message={'message': 'Failed to upload file. Please try again.'}
+    return render_template('upload.html', 
+                           upload_object_counts=upload_object_counts, 
+                           upload_object_types_count=upload_object_types_count, 
+                           global_object_counts=global_object_counts, 
+                           global_object_types_count=global_object_types_count, 
+                           json_message=return_message)
 
 @upload_bp.route('/import', methods=['POST'])
 def csv2database():
     table_data = request.get_json()
 
     table_name = table_data['table_name']
-    print(table_name)
     data = table_data['data']
 
     if data:
@@ -44,11 +66,9 @@ def csv2database():
         # 对列名进行映射
         #df = df.rename(columns=get_head_mappings()[table_name])
 
-        flash('File imported into ' +  table_name +' successfully!', 'success')
+        return jsonify(message='File imported into ' +  table_name +' successfully!')
     else:
-        flash('Please upload file before importing file.', 'warn')
-        pass
-    return redirect(url_for('upload.upload_csv'))
+        return jsonify(message='Please upload file before importing file.')
 
 # 获取所有表名
 def get_head_mappings():

@@ -9,39 +9,30 @@
     </div>
     <div class="row">
         <div class="col-md-6">
-            <form method="POST" enctype="multipart/form-data" action="{{ url_for('upload.upload_csv') }}" class="form-inline">
+            <form action="{{ url_for('upload.upload_csv') }}" method="post" enctype="multipart/form-data" id="upload-form" class="form-inline">
                 <div class="form-group">
                     <input type="file" name="file" class="form-control-file mr-2">
                 </div>
-                <button type="submit" class="btn btn-primary">Upload</button>
-            </form>
-        </div>
-        <br>
-        <div class="col-md-6">
-            <form id="upload-form" class="form-inline">
-                <div class="form-group">
-                    <label for="table-name-select">Select Table:</label>
-                    <select class="form-control mr-2" id="table-name-select" name="table_name">
-                        {% for table_name in table_names %}
-                        <option>{{ table_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <button type="button" id="import-btn" class="btn btn-primary" style="margin-left: 150px;">Import...</button>
+                <button type="submit" id="upload-btn" class="btn btn-primary">Upload</button>
             </form>
         </div>
     </div>
-
-    {% if data %}
-    <div class="table-responsive">
-        <div class="col-md-12">
-            <h2>CSV Data</h2>
-            <div id="csv-table">
-                
-            </div>
-        </div>
-    </div>
-    {% endif %}
+    <h2>Upload Statistics</h2>
+    <p>Total object types: {{ upload_object_types_count }}</p>
+    <h3>Counts by object type:</h3>
+    <ul>
+    {% for object_name, count in upload_object_counts.items() %}
+        <li>{{ object_name }}: {{ count }}</li>
+    {% endfor %}
+    </ul>
+    <h2>Global Statistics</h2>
+    <p>Total object types: {{ global_object_types_count }}</p>
+    <h3>Counts by object type:</h3>
+    <ul>
+    {% for object_name, count in global_object_counts.items() %}
+        <li>{{ object_name }}: {{ count }}</li>
+    {% endfor %}
+    </ul>
 </div>
 {% endblock %}
 
@@ -49,47 +40,32 @@
 {{ super() }}
 <script>
   $(document).ready(function() {
-    var tableData = JSON.parse('{{ data | tojson | safe }}');
-    var columns = [];
-
-    if (tableData.length > 0) {
-      var keys = Object.keys(tableData[0]);
-      keys.forEach(function(key) {
-        columns.push({title: key, field: key, editor: "input"});
-      });
-    }
-
-    var table = new Tabulator("#csv-table", {
-      data: tableData,
-      columns: columns,
-      layout: "fitColumns",
-      pagination: "local",
-      paginationSize: 10,
-      paginationSizeSelector: [10, 25, 50, 100]
-    });
-
-    $('#import-btn').click(function() {
-        var tableName = $('#table-name-select').val(); // Get selected table name
-        var data = table.getData(); // Get all data of the table
-        var postData = {
-            table_name: tableName,
-            data: data,
-        };
-
+    $('#upload1-btn').click(function() {
+        var formData = new FormData($('#upload-form')[0]);
+        var message = {{ json_message | safe }};
         $.ajax({
-            url: "{{ url_for('upload.csv2database') }}",
+            url: '/upload',
             type: 'POST',
             contentType: 'application/json',
-            data: JSON.stringify(postData),
-            dataType: 'json',
+            data: formData,
+            processData: false,
+            contentType: false,
             success: function(response) {
-            // TODO: Handle the response from the server
+                Swal.fire({
+                    icon: 'success',
+                    title: '操作成功',
+                    text: message
+                });
             },
             error: function(error) {
-            // TODO: Handle errors
+                Swal.fire({
+                    icon: 'error',
+                    title: '发生错误',
+                    text: message
+                });
             },
-        });
-    });
-  });
+        });        
+    });    
+});
 </script>
 {% endblock %}
