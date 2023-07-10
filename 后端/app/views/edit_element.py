@@ -1,31 +1,65 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash,session
-from app import app,db
-from sqlalchemy import MetaData, Table, create_engine, text
-from ..models.line_model import LineModel
+from flask import Blueprint, render_template, request, session
+from app import app
+from .get_mappings import get_head_mappings,get_all_element_names
+import pandas as pd
+import pickle
+import json
+from ..circuit.OpendssElementFactory import ElementFactory
+from ..circuit.line import Line
+from ..circuit.linecode import Linecode
 
 edit_table_bp = Blueprint('edit_table', __name__, url_prefix='/edit_table')
+opendss_dict = {}
+table_name = ''
 
 @edit_table_bp.route('/') 
 def select_table():
-    table_names = get_all_table_names()
-    return render_template('edit_table.html', records=None, table_names=table_names)
-
-@edit_table_bp.route('/edit', methods=['POST'])
-def edit_table():
-    table_names = get_all_table_names()
-    table_name = request.form.get('table_name')
-    # 获取模型类引用
-    model_class = globals()[table_name]
-    # 查询该模型的所有记录
-    records = model_class.query.all()
-    #转成字典，方便序列化
-    records_dicts = [record.to_dict() for record in records]
+    global opendss_dict,table_name
     
-    return render_template('edit_table.html', records=records_dicts, table_names=table_names)
+    opendss_filepath = session.get('opendss_filepath', [])
+    
+    if opendss_filepath:        
+        #
+        with open(opendss_filepath, 'rb') as f:
+            opendss_dict = pickle.load(f)
+    else:
+        opendss_dict = {}
+    
+    return render_template('edit_table.html', table_names=get_all_element_names(), current_table = table_name)
 
-# 获取所有表名
-def get_all_table_names():
-    meta = MetaData()
-    meta.reflect(bind=db.engine)
-    table_names = [table for table in meta.tables]
-    return table_names 
+@edit_table_bp.route('/edit_element', methods=['POST'])
+def edit_element():
+    global opendss_dict,table_name
+    table_name = request.form.get('table_name')
+    
+    if not opendss_dict:
+        opendss_element =  {}
+    else:        
+        opendss_element = json.dumps(opendss_dict[table_name].to_dict('records'))
+    
+    return render_template('edit_element.html', opendss_element = opendss_element, table_names = get_all_element_names(), current_table = table_name)
+
+@edit_table_bp.route('/save_table', methods=['POST'])
+def save_table():
+    global opendss_dict,table_name
+    opendss_filepath = session.get('opendss_filepath', [])
+    opendss_element = request.get_json()
+    
+    #保存回缓存文件
+    if opendss_filepath:        
+        opendss_dict[table_name] = pd.DataFrame(opendss_element)        
+        with open(opendss_filepath, 'wb') as f:
+            pickle.dump(opendss_dict, f)
+    
+    return render_template('edit_element.html', opendss_element = opendss_element, table_names = get_all_element_names(), current_table = table_name)
+
+@edit_table_bp.route('/import', methods=['POST'])
+def excel2opendss():
+    global opendss_dict,table_name
+    
+    opendss_element_obj = ElementFactory.create_opendss_element(table_name, opendss_dict[table_name])
+    if opendss_element_obj.check():
+        opendss_scipots = opendss_element_obj.convert()
+    print(opendss_scipots)
+    opendss_element = json.dumps(opendss_dict[table_name].to_dict('records'))
+    return render_template('edit_element.html', opendss_element = opendss_element, table_names = get_all_element_names(), current_table = table_name)

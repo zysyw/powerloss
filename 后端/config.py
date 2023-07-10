@@ -11,3 +11,4 @@ SECRET_KEY = '123456'
 
 UPLOAD_FOLDER = './uploads'
 ALLOWED_EXTENSIONS = {'xlsx'}
+OPENDSS_FILEPATH = './uploads/opendss_dict.pkl'

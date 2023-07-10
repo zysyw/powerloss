@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <h1>Edit Table</h1>
+        </div>
+    </div>
+    <div class="form-row">
+      <form action="{{ url_for('edit_table.edit_element') }}" method="POST" class="form-inline">
+        <div class="form-group">
+          <label for="table-name-select">Select Table:  </label>
+          <select class="form-control mr-2" id="table-name-select" name="table_name" style="width: 200px;">
+              {% for table_name in table_names %}
+                  {% if table_name == current_table %}
+                      <option selected="selected">{{ table_name }}</option>
+                  {% else %}
+                      <option>{{ table_name }}</option>
+                  {% endif %}
+              {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-primary" style="margin-left: 130px;">Edit</button>
+        </div>
+      </form>
+      <form action="{{ url_for('edit_table.excel2opendss') }}" method="POST" class="form-inline">
+        <button type="submit" class="btn btn-primary" style="margin-left: 130px;">Import</button>
+      </form>
+    </div>
+    {% if opendss_element %}
+      <div class="table-responsive">
+        <div>
+          <button id="add-row">插入一行</button>
+          <button id="del-row">删除行</button>
+          <button id="clear">清空表格</button>
+          <button id="reset">重置表格</button>
+          <button id="save">保存表格</button>
+        </div>
+        <div id="edit-table"></div>
+      </div>
+    {% else %}
+      <script>
+          Swal.fire({
+              icon: 'error',
+              title: '没有找到任何记录!',
+              text: '请重新上传文件...',
+          });
+      </script>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+      
+      var opendss_element_data = JSON.parse('{{ opendss_element | safe }}');
+      var columns = [];
+  
+      // Process columns
+      var columns = Object.keys(opendss_element_data[0]).filter(key => !key.startsWith('_')).map(key => {
+        return {title: key, field: key, editor:"input"};
+      });
+      //selectable row
+      columns.unshift({
+        formatter:"rowSelection", 
+        titleFormatter:"rowSelection", 
+        align:"center", 
+        headerSort:false, 
+        cellClick:function(e, cell){
+          cell.getRow().toggleSelect();
+        }
+      });
+
+      // Initialize Tabulator
+      var table = new Tabulator("#edit-table", {
+        data: opendss_element_data,
+        addRowPos:"bottom",
+        columns: columns,
+        layout: "fitDataTable",
+        selectable: true, //设置表格行的多选
+        pagination: "local",
+        paginationSize: 10,
+        paginationSizeSelector: [10, 25, 50, 100],
+        movableColumns: true,
+      });
+
+      //Add row on "Add Row" button click
+      document.getElementById("add-row").addEventListener("click", function(){
+        var selectedRows = table.getSelectedRows(); // 获取选中行
+        if (selectedRows.length > 0) { // 如果有选中的行
+          var selectedRow = selectedRows[selectedRows.length - 1]; // 获取最后一个选中行
+          table.addRow({}, false).then(function(newRow) { // 新行添加后会返回 Promise，可以通过 then 方法获取新行
+            table.moveRow(newRow, selectedRow, false); // 将新行移动到选中行下面
+          });
+        } else {
+            table.addRow({});
+        }
+      });
+
+      //Delete row on "Delete Row" button click
+      document.getElementById("del-row").addEventListener("click", function(){
+        var selectedRows = table.getSelectedRows();
+        selectedRows.forEach(function(row) {
+            row.delete();
+        });  
+        table.redraw(true);
+      });
+
+      //Clear table on "Empty the table" button click
+      document.getElementById("clear").addEventListener("click", function(){
+          table.clearData()
+      });
+
+      //Reset table contents on "Reset the table" button click
+      document.getElementById("reset").addEventListener("click", function(){
+          table.setData(opendss_element_data);
+      });
+
+      //Save table contents on "Save the table" button click
+      document.getElementById("save").addEventListener("click", function(){
+          var tableData = table.getData();  // 获取表格数据
+          var jsonString = JSON.stringify(tableData);  // 将表格数据转换为 JSON 字符串
+
+          $.ajax({
+              url: "{{ url_for('edit_table.save_table') }}",  // 将数据发送到的端点
+              method: 'POST',  // 使用的 HTTP 方法
+              contentType: 'application/json',  // 发送的数据类型
+              data: jsonString,  // 发送的数据
+              success: function(response) {
+                  // 这里是处理服务器返回的数据的地方。你可以根据需要进行修改。
+                  alert('Data saved successfully.');
+              }
+          });
+      });
+
+    });
+  </script>
+{% endblock %}

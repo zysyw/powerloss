@@ -9,7 +9,7 @@
     </div>
     <div class="row">
         <div class="col-md-6">
-            <form action="{{ url_for('upload.upload_csv') }}" method="post" enctype="multipart/form-data" id="upload-form" class="form-inline">
+            <form action="{{ url_for('upload.upload_excel') }}" method="post" enctype="multipart/form-data" id="upload-form" class="form-inline">
                 <div class="form-group">
                     <input type="file" name="file" class="form-control-file mr-2">
                 </div>
@@ -17,22 +17,16 @@
             </form>
         </div>
     </div>
-    <h2>Upload Statistics</h2>
-    <p>Total object types: {{ upload_object_types_count }}</p>
-    <h3>Counts by object type:</h3>
-    <ul>
-    {% for object_name, count in upload_object_counts.items() %}
-        <li>{{ object_name }}: {{ count }}</li>
-    {% endfor %}
-    </ul>
-    <h2>Global Statistics</h2>
-    <p>Total object types: {{ global_object_types_count }}</p>
-    <h3>Counts by object type:</h3>
-    <ul>
-    {% for object_name, count in global_object_counts.items() %}
-        <li>{{ object_name }}: {{ count }}</li>
-    {% endfor %}
-    </ul>
+
+    <div class="table-responsive">
+        <div class="col-md-12">
+            <h2>上传文件内容统计</h2>
+            <div id="Upload-Statistics">
+                
+            </div>
+        </div>
+    </div>
+    
 </div>
 {% endblock %}
 
@@ -40,31 +34,22 @@
 {{ super() }}
 <script>
   $(document).ready(function() {
-    $('#upload1-btn').click(function() {
-        var formData = new FormData($('#upload-form')[0]);
-        var message = {{ json_message | safe }};
-        $.ajax({
-            url: '/upload',
-            type: 'POST',
-            contentType: 'application/json',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function(response) {
-                Swal.fire({
-                    icon: 'success',
-                    title: '操作成功',
-                    text: message
-                });
-            },
-            error: function(error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: '发生错误',
-                    text: message
-                });
-            },
-        });        
+    var tableData = JSON.parse('{{ display_json | safe }}');
+    var columns = [];
+
+    var table = new Tabulator("#Upload-Statistics", {
+    data: tableData,
+    columns:[
+        {title:"名称映射", field:"name_mapping"},
+        {title:"属性映射", field:"attribute_mapping", formatter:"textarea"},  // multi-line text
+        {title:"缺失列", field:"col_missing", formatter:"textarea"},  // multi-line text
+        {title:"缺失数据", field:"data_missing", formatter:"textarea"},  // multi-line text
+    ],
+    layout: "fitColumns",
+    placeholder:"等待数据, 请上传文件",
+    pagination: "local",
+    paginationSize: 10,
+    paginationSizeSelector: [10, 25, 50, 100]
     });    
 });
 </script>

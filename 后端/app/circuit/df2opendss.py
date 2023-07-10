@@ -25,29 +25,35 @@ def load_config():
 
     return config
 
-def create_scripts_from_df(df, component_type):
+def create_scripts_from_df(df, element_type):
     
     # 读取配置文件
     config = load_config()
     
     dss_scripts = []
-    required_columns = get_required_columns_from_config(config, component_type)
+    required_columns = get_required_columns_from_config(config, element_type)
+    
     if set(required_columns).issubset(df.columns):
         for _, row in df.iterrows():
-            dss_scripts.append(config[component_type].format(**row.to_dict()))
+            # 检查当前行的必需列是否全部不为空
+            if not row[required_columns].isnull().any():
+                # 格式化并添加到dss_scripts中
+                dss_scripts.append(config[element_type].format(**row.to_dict()))
+            else:
+                # 触发一个错误
+                raise ValueError('Row with index {} has null value(s) in required column(s)'.format(_))
     else:
         missing_columns = set(required_columns) - set(df.columns)
-        print("DataFrame 缺少以下列：", missing_columns)
-    
+        raise ValueError('Missing required column(s): {}'.format(', '.join(missing_columns)))
 
     return dss_scripts
 
-def get_required_columns_from_config(config, component_type):
+def get_required_columns_from_config(config, element_type):
     # 从配置文件中获取对应元件的模板字符串
-    template_str = config.get(component_type)
+    template_str = config.get(element_type)
 
     if template_str is None:
-        raise ValueError(f"Unsupported component type {component_type}")
+        raise ValueError(f"Unsupported component type {element_type}")
 
     # 使用正则表达式查找模板字符串中的占位符
     required_columns = re.findall(r'\{(.*?)\}', template_str)
